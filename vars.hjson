@@ -1,0 +1,24 @@
+# all fields are optional, config syntax can be found on https://hjson.org/
+
+# the language of these vars
+# valid options: js, groovy
+# default: js
+lang: js
+
+# the imports needed for these vars
+# valid options: packages only
+# default: none
+imports: [
+  "com.example"
+  "java.math"
+]
+
+# the default timeout for these vars in seconds. this is the time after which the execution will be interrupted
+# valid options: anything
+# default: 5
+timeout: 5
+
+# the number of messages the command uses
+# valid options: anything
+# default: 1
+length: 1

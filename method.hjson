@@ -1,0 +1,36 @@
+# all fields are optional, config syntax can be found on https://hjson.org/
+
+# the language of this method
+# valid options: js, groovy
+# default: js
+lang: js
+
+# the imports needed for this method
+# valid options: packages only
+# default: none
+imports: [
+  "com.example"
+  "java.math"
+]
+
+# the default timeout for this method in seconds. this is the time after which the execution will be interrupted
+# valid options: anything
+# default: 5
+timeout: 5
+
+# the number of messages the method uses
+# valid options: anything
+# default: 1
+length: 1
+
+# the return-type of this method
+# valid options: any full java class name, primitive type or void
+# default: void
+type: void
+
+# the parameters of this method in the order they should have
+# valid options: any pair of parameter name + type (any full java class name or primitive type)
+# default: none
+params: {
+    name: java.lang.String
+}

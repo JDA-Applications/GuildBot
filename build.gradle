@@ -1,0 +1,33 @@
+plugins {
+    id 'java'
+    id 'application'
+    id 'com.github.johnrengelman.shadow' version '2.0.0'
+    id 'com.github.ben-manes.versions' version '0.15.0'
+}
+
+mainClassName = 'io.github.jdaapplications.guildbot.GuildBot'
+
+group = 'io.github.jda-applications'
+version '2.0'
+
+sourceCompatibility = 1.8
+
+repositories {
+    jcenter()
+}
+
+dependencies {
+    compile group: 'net.dv8tion', name: 'JDA', version: '3.1.1_213'
+    compile group: 'com.sedmelluq', name: 'lavaplayer', version: '1.2.42'
+    compile group: 'org.hjson', name: 'hjson', version: '2.1.1'
+    compile group: 'org.codehaus.groovy', name: 'groovy-jsr223', version: '2.4.9'
+    compile group: 'ch.qos.logback', name: 'logback-classic', version: '1.2.3' 
+}
+
+compileJava.options.encoding = 'UTF-8'
+
+task wrapper(type: Wrapper) {
+    group = 'build setup'
+    description = 'Generates Gradle wrapper files.'
+    gradleVersion = '4.0'
+}

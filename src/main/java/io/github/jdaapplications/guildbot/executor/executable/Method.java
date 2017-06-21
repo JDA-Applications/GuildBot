@@ -1,0 +1,153 @@
+package io.github.jdaapplications.guildbot.executor.executable;
+
+import io.github.jdaapplications.guildbot.GuildBot;
+import io.github.jdaapplications.guildbot.executor.Engine;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.stream.Collectors;
+import javax.script.ScriptContext;
+import javax.script.ScriptEngine;
+import org.apache.commons.collections4.map.LazyMap;
+import org.apache.commons.lang3.tuple.Pair;
+import org.hjson.JsonObject;
+
+/**
+ * 
+ * @author Aljoscha Grebe
+ *
+ */
+public class Method extends Executable
+{
+    protected final Map<Engine, String> executableScripts;
+    protected final String name;
+    protected final List<Pair<String, ? extends Class<?>>> params;
+    protected final String proxyScript;
+    protected final Class<?> type;
+
+    public Method(final GuildBot guildBot, final JsonObject config, final String name, final String script)
+    {
+        super(guildBot, config, script);
+        this.name = name;
+
+        this.type = this.getClass(config.getString("type", "void"));
+
+        final JsonObject paramList = (JsonObject) config.get("params");
+
+        this.params = Collections.unmodifiableList(paramList == null ? Collections.emptyList() : paramList.names().stream().map(k -> Pair.of(k, this.getClass(paramList.get(k).asString()))).collect(Collectors.toList()));
+
+        this.executableScripts = Collections.unmodifiableMap(LazyMap.lazyMap(new HashMap<>(Engine.values().length), e -> e.getProxyMethod(name, this.type, this.params)));
+
+        this.proxyScript = this.engine.getScript(script, this.imports);
+    }
+
+    public String getExecutableScript(final Engine engine)
+    {
+        return this.executableScripts.get(engine);
+    }
+
+    public Map<Engine, String> getExecutableScripts()
+    {
+        return this.executableScripts;
+    }
+
+    public InvokeableMethod getInvokeableMethod(final ScriptContext context)
+    {
+        return args -> Method.this.invoke(context, args);
+    }
+
+    public String getName()
+    {
+        return this.name;
+    }
+
+    public List<Pair<String, ? extends Class<?>>> getParams()
+    {
+        return this.params;
+    }
+
+    public String getProxyScript()
+    {
+        return this.proxyScript;
+    }
+
+    public Class<?> getType()
+    {
+        return this.type;
+    }
+
+    protected Class<?> getClass(final String name)
+    {
+        switch (name)
+        {
+            case "void":
+                return void.class;
+            case "byte":
+                return byte.class;
+            case "short":
+                return short.class;
+            case "int":
+                return int.class;
+            case "long":
+                return long.class;
+            case "float":
+                return float.class;
+            case "double":
+                return double.class;
+            case "char":
+                return char.class;
+            case "boolean":
+                return boolean.class;
+            default:
+                try
+                {
+                    return Class.forName(name);
+                }
+                catch (final ClassNotFoundException e)
+                {
+                    throw new RuntimeException();
+                }
+        }
+    }
+
+    protected Object invoke(final ScriptContext context, final Object... args)
+    {
+        try
+        {
+            final ScriptEngine scriptEngine = this.engine.newScriptEngine();
+            scriptEngine.getContext().getBindings(ScriptContext.ENGINE_SCOPE).putAll(context.getBindings(ScriptContext.ENGINE_SCOPE));
+
+            if (args != null)
+                for (int i = 0; i < this.params.size(); i++)
+                    scriptEngine.put(this.params.get(i).getKey(), args[i]);
+
+            final Future<?> future = this.guildBot.getThreadPool().submit(() -> scriptEngine.eval(this.proxyScript));
+
+            final Object result = future.get(this.config.getInt("timeout", this.guildBot.getConfig().getInt("timeout", 5)), TimeUnit.SECONDS);
+
+            return this.type == Void.TYPE ? null : result;
+        }
+        catch (InterruptedException | TimeoutException e)
+        {
+            throw new RuntimeException("The execution of method \"" + this.name + "\" timed out\n" + this.proxyScript, e);
+        }
+        catch (final Exception e)
+        {
+            throw new RuntimeException("The execution of method \"" + this.name + "\" threw an error\n" + this.proxyScript, e);
+        }
+    }
+
+    /**
+     * 
+     * @author Aljoscha Grebe
+     *
+     */
+    public interface InvokeableMethod
+    {
+        Object invoke(final Object... args);
+    }
+}

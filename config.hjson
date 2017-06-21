@@ -1,0 +1,8 @@
+# The guild id the bot should use as base
+guildId: 197072474679017472
+
+# the default prefix
+prefix: &&
+
+# the default timeout for the execution commands, methods and vars in seconds
+timeout: 5
