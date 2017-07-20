@@ -4,9 +4,7 @@ import io.github.jdaapplications.guildbot.GuildBot;
 import org.hjson.JsonObject;
 
 /**
- * 
  * @author Aljoscha Grebe
- *
  */
 public class Command extends Executable
 {

@@ -11,9 +11,7 @@ import javax.script.ScriptEngine;
 import javax.script.ScriptException;
 
 /**
- *
  * @author Aljoscha Grebe
- *
  */
 public class EngineMap
 {

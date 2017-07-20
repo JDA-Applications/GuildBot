@@ -9,9 +9,7 @@ import org.hjson.JsonObject;
 import org.hjson.JsonValue;
 
 /**
- * 
  * @author Aljoscha Grebe
- *
  */
 public abstract class Executable
 {

@@ -13,13 +13,12 @@ import java.util.stream.Collectors;
 import javax.script.ScriptContext;
 import javax.script.ScriptEngine;
 import org.apache.commons.collections4.map.LazyMap;
+import org.apache.commons.lang3.ClassUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.hjson.JsonObject;
 
 /**
- * 
  * @author Aljoscha Grebe
- *
  */
 public class Method extends Executable
 {
@@ -34,11 +33,31 @@ public class Method extends Executable
         super(guildBot, config, script);
         this.name = name;
 
-        this.type = this.getClass(config.getString("type", "void"));
+        try
+        {
+            this.type = ClassUtils.getClass(config.getString("type", "void"));
+        }
+        catch (ClassNotFoundException e)
+        {
+            throw new RuntimeException(e);
+        }
 
         final JsonObject paramList = (JsonObject) config.get("params");
 
-        this.params = Collections.unmodifiableList(paramList == null ? Collections.emptyList() : paramList.names().stream().map(k -> Pair.of(k, this.getClass(paramList.get(k).asString()))).collect(Collectors.toList()));
+        this.params = Collections.unmodifiableList(paramList == null 
+                ? Collections.emptyList() 
+                : paramList.names().stream()
+                    .map(k -> {
+                        try
+                        {
+                            return Pair.of(k, ClassUtils.getClass(paramList.get(k).asString()));
+                        }
+                        catch (ClassNotFoundException e)
+                        {
+                            throw new RuntimeException(e);
+                        }
+                    })
+                    .collect(Collectors.toList()));
 
         this.executableScripts = Collections.unmodifiableMap(LazyMap.lazyMap(new HashMap<>(Engine.values().length), e -> e.getProxyMethod(name, this.type, this.params)));
 
@@ -80,40 +99,6 @@ public class Method extends Executable
         return this.type;
     }
 
-    protected Class<?> getClass(final String name)
-    {
-        switch (name)
-        {
-            case "void":
-                return void.class;
-            case "byte":
-                return byte.class;
-            case "short":
-                return short.class;
-            case "int":
-                return int.class;
-            case "long":
-                return long.class;
-            case "float":
-                return float.class;
-            case "double":
-                return double.class;
-            case "char":
-                return char.class;
-            case "boolean":
-                return boolean.class;
-            default:
-                try
-                {
-                    return Class.forName(name);
-                }
-                catch (final ClassNotFoundException e)
-                {
-                    throw new RuntimeException();
-                }
-        }
-    }
-
     protected Object invoke(final ScriptContext context, final Object... args)
     {
         try
@@ -141,11 +126,6 @@ public class Method extends Executable
         }
     }
 
-    /**
-     * 
-     * @author Aljoscha Grebe
-     *
-     */
     public interface InvokeableMethod
     {
         Object invoke(final Object... args);

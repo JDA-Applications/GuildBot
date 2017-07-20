@@ -1,12 +1,14 @@
 package io.github.jdaapplications.guildbot;
 
 import io.github.jdaapplications.guildbot.executor.CommandExecutor;
+import io.github.jdaapplications.guildbot.util.Properties;
 import net.dv8tion.jda.core.*;
 import net.dv8tion.jda.core.entities.Game;
 import net.dv8tion.jda.core.entities.impl.JDAImpl;
 import net.dv8tion.jda.core.entities.impl.MessageEmbedImpl;
 import net.dv8tion.jda.core.events.ReadyEvent;
 import net.dv8tion.jda.core.events.ShutdownEvent;
+import net.dv8tion.jda.core.exceptions.RateLimitedException;
 import net.dv8tion.jda.core.hooks.AnnotatedEventManager;
 import net.dv8tion.jda.core.hooks.SubscribeEvent;
 import net.dv8tion.jda.core.requests.Requester;
@@ -21,43 +23,58 @@ import org.slf4j.LoggerFactory;
 
 import java.awt.Color;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.FileReader;
-import java.nio.file.Files;
-import java.nio.file.Path;
+import java.io.IOException;
 import java.nio.file.Paths;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import javax.security.auth.login.LoginException;
 
 /**
+ * The main class.
  * 
  * @author Aljoscha Grebe
- *
  */
 public class GuildBot
 {
     public static final Logger log = LoggerFactory.getLogger(GuildBot.class);
+
     private static final AtomicInteger threadCounter = new AtomicInteger(0);
     private static final Color error = Color.red;
 
-    private CommandExecutor commandExecutor;
-
     private final String webhookUrl;
     private final JsonObject config;
-    private JDA jda;
-    private ScheduledThreadPoolExecutor threadPool;
+    private final JDA jda;
+    private final ScheduledThreadPoolExecutor threadPool;
 
-    public GuildBot(final File config, final String token, final String errorWebhook) throws Exception
+    private CommandExecutor commandExecutor;
+
+    public GuildBot(final File config, final String token, final String errorWebhook) throws LoginException, IllegalArgumentException, RateLimitedException, FileNotFoundException, IOException
     {
         this.config = JsonValue.readHjson(new FileReader(config)).asObject();
         this.webhookUrl = errorWebhook;
+
+        this.threadPool = new ScheduledThreadPoolExecutor(4, r ->
+        {
+            final Thread t = new Thread(r, "GuildBot-" + GuildBot.threadCounter.getAndIncrement());
+            t.setUncaughtExceptionHandler((thread, throwable) ->
+            {
+                GuildBot.log.error("An error occurred", throwable);
+                handleThrowable(throwable, "Uncaught error in thread: " + thread.getName());
+            });
+            return t;
+        });
+        this.threadPool.setKeepAliveTime(1, TimeUnit.MINUTES);
 
         final JDABuilder builder = new JDABuilder(AccountType.BOT);
 
         builder.setEventManager(new AnnotatedEventManager());
 
         builder.setToken(token);
+
         builder.setGame(Game.of("loading..."));
         builder.setStatus(OnlineStatus.DO_NOT_DISTURB);
 
@@ -70,24 +87,13 @@ public class GuildBot
     {
         final File config = new File(System.getProperty("guildbot.config", "config.hjson"));
 
-        String token = System.getProperty("guildbot.token");
-        String webhook = System.getProperty("guildbot.webhook.error");
+        String token = Properties.get("guildbot.token", Paths.get(".token"));
         if (token == null)
-        {
-            Path path = Paths.get(".token");
+            throw new RuntimeException("could not find a token");
 
-            if (!path.toFile().exists())
-                throw new RuntimeException("could not find a token");
-
-            token = Files.readAllLines(path).get(0);
-        }
+        String webhook = Properties.get("guildbot.webhook.error", Paths.get(".error-hook"));
         if (webhook == null)
-        {
-            Path path = Paths.get(".error-hook");
-
-            if (path.toFile().exists())
-                webhook = Files.readAllLines(path).get(0);
-        }
+            GuildBot.log.warn("could not find a error webhook token, disabling webhook");
 
         new GuildBot(config, token, webhook);
     }
@@ -180,27 +186,13 @@ public class GuildBot
     }
 
     @SubscribeEvent
-    public void onReady(final ReadyEvent event)
+    private void onReady(final ReadyEvent event)
     {
-        this.jda = event.getJDA();
-
-        this.threadPool = new ScheduledThreadPoolExecutor(4, r ->
-        {
-            final Thread t = new Thread(r, "GuildBot-" + GuildBot.threadCounter.getAndIncrement());
-            t.setUncaughtExceptionHandler((thread, throwable) ->
-            {
-                GuildBot.log.error("An error occurred", throwable);
-                handleThrowable(throwable, "Uncaught error in thread: " + thread.getName());
-            });
-            return t;
-        });
-        this.threadPool.setKeepAliveTime(1, TimeUnit.MINUTES);
-
         this.commandExecutor = new CommandExecutor(this);
     }
 
     @SubscribeEvent
-    public void onShutdown(final ShutdownEvent event)
+    private void onShutdown(final ShutdownEvent event)
     {
         this.threadPool.setKeepAliveTime(10, TimeUnit.SECONDS);
         this.threadPool.allowCoreThreadTimeOut(true);

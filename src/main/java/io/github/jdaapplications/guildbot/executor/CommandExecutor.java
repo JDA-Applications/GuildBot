@@ -39,9 +39,7 @@ import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 /**
- * 
  * @author Aljoscha Grebe
- *
  */
 public class CommandExecutor
 {
@@ -56,11 +54,6 @@ public class CommandExecutor
         this.guildBot = guildBot;
 
         guildBot.getThreadPool().execute(this::init);
-    }
-
-    public void delete(final TextChannel channel)
-    {
-        this.delete(channel.getGuild().getIdLong(), channel.getName());
     }
 
     public Map<String, Command> getCommands()
@@ -84,35 +77,25 @@ public class CommandExecutor
     }
 
     @SubscribeEvent
-    public void onReconnect(final ReconnectedEvent event)
-    {
-        Guild guild = event.getJDA().getGuildById(guildBot.getConfig().getLong("guildId", 0));
-        if (guild == null)
-            return;
-        guildBot.getThreadPool().execute(() ->
-            guild.getTextChannels().forEach(this::update));
-    }
-
-    @SubscribeEvent
-    public void onGuildMessageDelete(final GuildMessageDeleteEvent event)
+    private void onGuildMessageDelete(final GuildMessageDeleteEvent event)
     {
         this.update(event.getChannel());
     }
 
     @SubscribeEvent
-    public void onGuildMessageReceived(final GuildMessageReceivedEvent event)
+    private void onGuildMessageReceived(final GuildMessageReceivedEvent event)
     {
         this.update(event.getChannel());
     }
 
     @SubscribeEvent
-    public void onGuildMessageUpdate(final GuildMessageUpdateEvent event)
+    private void onGuildMessageUpdate(final GuildMessageUpdateEvent event)
     {
         this.update(event.getChannel());
     }
 
     @SubscribeEvent
-    public void onMessageReceived(final MessageReceivedEvent event)
+    private void onMessageReceived(final MessageReceivedEvent event)
     {
         final String prefix = this.guildBot.getConfig().getString("prefix", this.guildBot.getJDA().getSelfUser().getAsMention() + ' ');
 
@@ -137,31 +120,42 @@ public class CommandExecutor
     }
 
     @SubscribeEvent
-    public void onTextChannelCreate(final TextChannelCreateEvent event)
+    private void onReconnect(final ReconnectedEvent event)
+    {
+        Guild guild = event.getJDA().getGuildById(guildBot.getConfig().getLong("guildId", 0));
+
+        if (guild == null)
+            return;
+
+        guildBot.getThreadPool().execute(() -> guild.getTextChannels().forEach(this::update));
+    }
+
+    @SubscribeEvent
+    private void onTextChannelCreate(final TextChannelCreateEvent event)
     {
         this.update(event.getChannel());
     }
 
     @SubscribeEvent
-    public void onTextChannelDelete(final TextChannelDeleteEvent event)
+    private void onTextChannelDelete(final TextChannelDeleteEvent event)
     {
         this.delete(event, event.getChannel().getName());
     }
 
     @SubscribeEvent
-    public void onTextChannelUpdateName(final TextChannelUpdateNameEvent event)
+    private void onTextChannelUpdateName(final TextChannelUpdateNameEvent event)
     {
         this.delete(event, event.getOldName());
         this.update(event.getChannel());
     }
 
     @SubscribeEvent
-    public void onTextChannelUpdateTopic(final TextChannelUpdateTopicEvent event)
+    private void onTextChannelUpdateTopic(final TextChannelUpdateTopicEvent event)
     {
         this.update(event.getChannel());
     }
 
-    public void update(final TextChannel channel)
+    private synchronized void update(final TextChannel channel)
     {
         if (channel.getGuild().getIdLong() != this.guildBot.getConfig().getLong("guildId", 0))
             return;
@@ -225,12 +219,12 @@ public class CommandExecutor
 
     }
 
-    private void delete(final GenericTextChannelEvent event, final String name)
+    private synchronized void delete(final GenericTextChannelEvent event, final String name)
     {
         this.delete(event.getGuild().getIdLong(), name);
     }
 
-    private void delete(final long guildId, final String name)
+    private synchronized void delete(final long guildId, final String name)
     {
         if (guildId != this.guildBot.getConfig().getLong("guildId", 0))
             return;
@@ -244,7 +238,12 @@ public class CommandExecutor
                 this.commands.remove(cName);
     }
 
-    private void execute(final Command command, final MessageReceivedEvent event, final String args)
+    private synchronized void delete(final TextChannel channel)
+    {
+        this.delete(channel.getGuild().getIdLong(), channel.getName());
+    }
+
+    private synchronized void execute(final Command command, final MessageReceivedEvent event, final String args)
     {
         final EngineMap scriptEngines = new EngineMap();
 
@@ -341,7 +340,7 @@ public class CommandExecutor
         }
     }
 
-    private void init()
+    private synchronized void init()
     {
         final JsonObject config = this.guildBot.getConfig();
 
@@ -352,7 +351,7 @@ public class CommandExecutor
 
         if (guild == null)
         {
-            GuildBot.log.error("Could not find the guild with id " + guildId);
+            GuildBot.log.error("Could not find a guild with id " + guildId + ", shutting bot down");
             jda.shutdown();
             return;
         }
@@ -377,7 +376,6 @@ public class CommandExecutor
             Collections.reverse(l);
             messages.put(c.getIdLong(), l.stream().map(Message::getRawContent).map(s ->
             {
-
                 final String name = configs.get(c.getIdLong()).getString("lang", "js");
                 if (s.startsWith("```" + name + '\n') && s.endsWith("\n```"))
                     return s.substring(4 + name.length(), s.length() - 4);

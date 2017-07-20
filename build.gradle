@@ -29,5 +29,5 @@ compileJava.options.encoding = 'UTF-8'
 task wrapper(type: Wrapper) {
     group = 'build setup'
     description = 'Generates Gradle wrapper files.'
-    gradleVersion = '4.0'
+    gradleVersion = '4.0.1'
 }

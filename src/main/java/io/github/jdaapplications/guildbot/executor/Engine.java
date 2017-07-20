@@ -11,9 +11,7 @@ import javax.script.ScriptEngineManager;
 import org.apache.commons.lang3.tuple.Pair;
 
 /**
- * 
  * @author Aljoscha Grebe
- *
  */
 public enum Engine
 {
@@ -23,8 +21,15 @@ public enum Engine
         @Override
         public String getProxyMethod(final String name, final Class<?> type, final List<Pair<String, ? extends Class<?>>> params)
         {
-            return type.getTypeName() + ' ' + name + '(' + params.stream().map(e -> e.getValue().getTypeName() + ' ' + e.getKey()).collect(Collectors.joining(", ")) + ") { " + name + ".invoke("
-                    + params.stream().map(Pair::getKey).collect(Collectors.joining(", ")) + ") }";
+            return type.getTypeName() + ' ' + name + '(' 
+                    + params.stream()
+                        .map(e -> e.getValue().getTypeName() + ' ' + e.getKey())
+                        .collect(Collectors.joining(", ")) 
+                    + ") { " + name + ".invoke(" 
+                    + params.stream()
+                        .map(Pair::getKey)
+                        .collect(Collectors.joining(", "))
+                    + ") }";
         }
 
         @Override
