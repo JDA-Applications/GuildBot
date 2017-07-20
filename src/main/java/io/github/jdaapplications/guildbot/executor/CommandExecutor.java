@@ -6,20 +6,12 @@ import io.github.jdaapplications.guildbot.GuildBot;
 import io.github.jdaapplications.guildbot.executor.executable.Command;
 import io.github.jdaapplications.guildbot.executor.executable.Method;
 import io.github.jdaapplications.guildbot.executor.executable.Variables;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.concurrent.*;
-import java.util.function.Consumer;
-import java.util.stream.Collectors;
-import javax.script.Bindings;
-import javax.script.ScriptContext;
-import javax.script.ScriptEngine;
 import net.dv8tion.jda.core.EmbedBuilder;
+import net.dv8tion.jda.core.JDA;
 import net.dv8tion.jda.core.MessageBuilder;
 import net.dv8tion.jda.core.OnlineStatus;
 import net.dv8tion.jda.core.entities.*;
+import net.dv8tion.jda.core.events.ReconnectedEvent;
 import net.dv8tion.jda.core.events.channel.text.GenericTextChannelEvent;
 import net.dv8tion.jda.core.events.channel.text.TextChannelCreateEvent;
 import net.dv8tion.jda.core.events.channel.text.TextChannelDeleteEvent;
@@ -30,9 +22,21 @@ import net.dv8tion.jda.core.events.message.guild.GuildMessageDeleteEvent;
 import net.dv8tion.jda.core.events.message.guild.GuildMessageReceivedEvent;
 import net.dv8tion.jda.core.events.message.guild.GuildMessageUpdateEvent;
 import net.dv8tion.jda.core.hooks.SubscribeEvent;
+import net.dv8tion.jda.core.managers.Presence;
 import net.dv8tion.jda.core.requests.RestAction;
 import org.hjson.JsonObject;
 import org.hjson.JsonValue;
+
+import javax.script.Bindings;
+import javax.script.ScriptContext;
+import javax.script.ScriptEngine;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.concurrent.*;
+import java.util.function.Consumer;
+import java.util.stream.Collectors;
 
 /**
  * 
@@ -51,17 +55,7 @@ public class CommandExecutor
     {
         this.guildBot = guildBot;
 
-        guildBot.getThreadPool().execute(() ->
-        {
-            try
-            {
-                this.init();
-            }
-            catch (final Exception t)
-            {
-                t.printStackTrace();
-            }
-        });
+        guildBot.getThreadPool().execute(this::init);
     }
 
     public void delete(final TextChannel channel)
@@ -87,6 +81,16 @@ public class CommandExecutor
     public Map<String, Variables> getVars()
     {
         return Collections.unmodifiableMap(this.vars);
+    }
+
+    @SubscribeEvent
+    public void onReconnect(final ReconnectedEvent event)
+    {
+        Guild guild = event.getJDA().getGuildById(guildBot.getConfig().getLong("guildId", 0));
+        if (guild == null)
+            return;
+        guildBot.getThreadPool().execute(() ->
+            guild.getTextChannels().forEach(this::update));
     }
 
     @SubscribeEvent
@@ -172,24 +176,30 @@ public class CommandExecutor
             Consumer<String> consumer;
 
             if (channel.getName().startsWith("mthd-"))
+            {
                 consumer = script ->
                 {
                     final String name = channel.getName().substring(5);
                     this.methods.put(name, new Method(this.guildBot, config, name, script));
                 };
+            }
             else if (channel.getName().startsWith("vars-"))
+            {
                 consumer = script ->
                 {
                     final String name = channel.getName().substring(5);
                     this.vars.put(name, new Variables(this.guildBot, config, script));
                 };
+            }
             else
+            {
                 consumer = script ->
                 {
-                    final Command command = new Command(this.guildBot, config, script);
-                    for (final String name : channel.getName().substring(4).split("\\-"))
+                    final Command command = new Command(this.guildBot, channel.getIdLong(), config, script);
+                    for (final String name : channel.getName().substring(4).split("-"))
                         this.commands.put(name, command);
                 };
+            }
 
             channel.getHistory().retrievePast(config.getInt("length", 1)).queue(l ->
             {
@@ -207,7 +217,9 @@ public class CommandExecutor
         }
         catch (final Exception e)
         {
-            GuildBot.log.error("An error occured while updating " + channel.getName(), e);
+            final String message = "An error occurred while updating " + channel.getName();
+            GuildBot.log.error(message, e);
+            guildBot.handleThrowable(e, message);
             this.delete(channel);
         }
 
@@ -243,40 +255,50 @@ public class CommandExecutor
         bindings.put("args", args == null ? "" : args);
         bindings.put("guildBot", this.guildBot);
 
+        final ScheduledExecutorService pool = this.guildBot.getThreadPool();
         for (final Entry<String, Variables> entry : this.vars.entrySet())
         {
-            final ScriptEngine engine = scriptEngines.get(entry.getValue().getEngine());
+            final Variables variables = entry.getValue();
+            final ScriptEngine engine = scriptEngines.get(variables.getEngine());
             try
             {
-                final Future<?> future = this.guildBot.getThreadPool().submit(() -> engine.eval(entry.getValue().getExecutableScript()));
-                future.get(entry.getValue().getConfig().getInt("timeout", this.guildBot.getConfig().getInt("timeout", 5)), TimeUnit.SECONDS);
+                final Future<?> future = pool.submit(() -> engine.eval(variables.getExecutableScript()));
+                future.get(variables.getConfig().getInt("timeout", this.guildBot.getConfig().getInt("timeout", 5)), TimeUnit.SECONDS);
             }
             catch (final Exception e)
             {
-                GuildBot.log.error("An error occured while evaluating the vars \"" + entry.getKey() + "\"\n" + entry.getValue().getExecutableScript(), e);
+                final String varName = entry.getKey();
+                GuildBot.log.error("An error occurred while evaluating the vars \"{}\"\n{}\n{}", varName, variables.getExecutableScript(), e);
+                final String varContext = String.format("Trying to evaluate var: %#s", event.getJDA().getTextChannelById(varName));
+                this.guildBot.handleThrowable(e, varContext);
             }
         }
 
         for (final Entry<String, Method> methodEntry : this.methods.entrySet())
         {
-            bindings.put(methodEntry.getKey(), methodEntry.getValue().getInvokeableMethod(context));
+            final String methodName = methodEntry.getKey();
+            final Method method = methodEntry.getValue();
+            bindings.put(methodName, method.getInvokeableMethod(context));
 
             for (final Entry<Engine, ScriptEngine> engineEntry : scriptEngines.entrySet())
             {
-                final String script = methodEntry.getValue().getExecutableScript(engineEntry.getKey());
+                final Engine engine = engineEntry.getKey();
+                final String script = method.getExecutableScript(engine);
                 if (script != null)
                     try
                     {
-                        engineEntry.getValue().eval(methodEntry.getValue().getExecutableScript(engineEntry.getKey()));
+                        engineEntry.getValue().eval(method.getExecutableScript(engine));
                     }
                     catch (final Exception e)
                     {
-                        GuildBot.log.error("An error occured while evaluating the method \"" + methodEntry.getKey() + "\"\n" + methodEntry.getValue().getExecutableScript(engineEntry.getKey()), e);
+                        GuildBot.log.error("An error occurred while evaluating the method \"{}\"\n{}\n{}", methodName, method.getExecutableScript(engine), e);
+                        final String methodContext = String.format("Trying to evaluate method: %#s", event.getJDA().getTextChannelById(methodName));
+                        this.guildBot.handleThrowable(e, methodContext);
                     }
             }
         }
 
-        final Future<?> future = this.guildBot.getThreadPool().submit(() -> scriptEngines.get(command.getEngine()).eval(command.getExecutableScript()));
+        final Future<?> future = pool.submit(() -> scriptEngines.get(command.getEngine()).eval(command.getExecutableScript()));
 
         Object result;
 
@@ -312,8 +334,10 @@ public class CommandExecutor
             event.getChannel().sendMessage(((EmbedBuilder) result).build()).queue();
         else if (result instanceof Throwable)
         {
-            GuildBot.log.error("An error occured while execution a command\n" + command.getExecutableScript(), (Throwable) result);
-            event.getChannel().sendMessage("An error occured").queue();
+            GuildBot.log.error("An error occurred while execution a command\n{}\n{}", command.getExecutableScript(), result);
+            final String commandContext = String.format("Trying to evaluate command: %#s", event.getJDA().getTextChannelById(command.getChannelId()));
+            this.guildBot.handleThrowable((Throwable) result, commandContext);
+            event.getChannel().sendMessage("An error occurred").queue();
         }
     }
 
@@ -323,12 +347,13 @@ public class CommandExecutor
 
         final long guildId = config.getLong("guildId", 0);
 
-        final Guild guild = this.guildBot.getJDA().getGuildById(guildId);
+        final JDA jda = this.guildBot.getJDA();
+        final Guild guild = jda.getGuildById(guildId);
 
         if (guild == null)
         {
             GuildBot.log.error("Could not find the guild with id " + guildId);
-            this.guildBot.getJDA().shutdown();
+            jda.shutdown();
             return;
         }
 
@@ -347,7 +372,7 @@ public class CommandExecutor
 
         final CountDownLatch latch = new CountDownLatch(channelCount);
         final TLongObjectMap<String> messages = new TLongObjectHashMap<>(channelCount);
-        channels.stream().forEach(c -> c.getHistory().retrievePast(configs.get(c.getIdLong()).getInt("length", 1)).queue(l ->
+        channels.forEach(c -> c.getHistory().retrievePast(configs.get(c.getIdLong()).getInt("length", 1)).queue(l ->
         {
             Collections.reverse(l);
             messages.put(c.getIdLong(), l.stream().map(Message::getRawContent).map(s ->
@@ -362,7 +387,8 @@ public class CommandExecutor
             latch.countDown();
         }, t ->
         {
-            GuildBot.log.error("An error occured while retrieving the messages of channel \"" + c.getName() + "\"", t);
+            GuildBot.log.error("An error occurred while retrieving the messages of channel \"" + c.getName() + "\"", t);
+            this.guildBot.handleThrowable(t, "RestAction failure trying to retrieve history");
             latch.countDown();
         }));
 
@@ -380,14 +406,14 @@ public class CommandExecutor
         {
             try
             {
-
                 final String name = c.getName().substring(5);
                 this.methods.put(name, new Method(this.guildBot, configs.get(c.getIdLong()), name, messages.get(c.getIdLong())));
             }
             catch (final Exception e)
             {
                 this.delete(c);
-                GuildBot.log.error("An error occured while initialising " + c.getName(), e);
+                GuildBot.log.error("An error occurred while initialising " + c.getName(), e);
+                this.guildBot.handleThrowable(e, "Setup for methods");
             }
         });
 
@@ -402,7 +428,8 @@ public class CommandExecutor
             catch (final Exception e)
             {
                 this.delete(c);
-                GuildBot.log.error("An error occured while initialising " + c.getName(), e);
+                GuildBot.log.error("An error occurred while initialising " + c.getName(), e);
+                this.guildBot.handleThrowable(e, "Setup for vars");
             }
         });
 
@@ -411,23 +438,26 @@ public class CommandExecutor
         {
             try
             {
-                final Command command = new Command(this.guildBot, configs.get(c.getIdLong()), messages.get(c.getIdLong()));
-                for (final String name : c.getName().substring(4).split("\\-"))
+                final Command command = new Command(this.guildBot, c.getIdLong(),
+                        configs.get(c.getIdLong()), messages.get(c.getIdLong()));
+                for (final String name : c.getName().substring(4).split("-"))
                     this.commands.put(name, command);
             }
             catch (final Exception e)
             {
                 this.delete(c);
-                GuildBot.log.error("An error occured while initialising " + c.getName(), e);
+                GuildBot.log.error("An error occurred while initialising " + c.getName(), e);
+                this.guildBot.handleThrowable(e, "Setup for commands");
             }
         });
 
         GuildBot.log.info("Accepting commands now");
 
-        this.guildBot.getJDA().getPresence().setStatus(OnlineStatus.ONLINE);
-        this.guildBot.getJDA().getPresence().setGame(Game.of(this.guildBot.getConfig().getString("prefix", this.guildBot.getJDA().getSelfUser().getAsMention() + ' ') + "help"));
+        Presence presence = jda.getPresence();
+        Game game = Game.of(config.getString("prefix", jda.getSelfUser().getAsMention() + ' ') + "help");
+        presence.setPresence(OnlineStatus.ONLINE, game);
 
-        this.guildBot.getJDA().addEventListener(this);
+        jda.addEventListener(this);
     }
 
     private boolean isScriptChannel(final TextChannel channel)

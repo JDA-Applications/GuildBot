@@ -17,7 +17,7 @@ repositories {
 }
 
 dependencies {
-    compile group: 'net.dv8tion', name: 'JDA', version: '3.1.1_213'
+    compile group: 'net.dv8tion', name: 'JDA', version: '3.2.0_228'
     compile group: 'com.sedmelluq', name: 'lavaplayer', version: '1.2.42'
     compile group: 'org.hjson', name: 'hjson', version: '2.1.1'
     compile group: 'org.codehaus.groovy', name: 'groovy-jsr223', version: '2.4.9'

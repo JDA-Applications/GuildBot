@@ -11,11 +11,12 @@ import org.hjson.JsonObject;
 public class Command extends Executable
 {
     protected final String executableScript;
+    protected final long id;
 
-    public Command(final GuildBot guildBot, final JsonObject config, final String script)
+    public Command(final GuildBot guildBot, final long channel, final JsonObject config, final String script)
     {
         super(guildBot, config, script);
-
+        this.id = channel;
         this.executableScript = this.engine.getScript(script, this.imports);
     }
 
@@ -24,4 +25,8 @@ public class Command extends Executable
         return this.executableScript;
     }
 
+    public long getChannelId()
+    {
+        return id;
+    }
 }
