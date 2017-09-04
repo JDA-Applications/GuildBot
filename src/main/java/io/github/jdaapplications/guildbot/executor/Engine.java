@@ -43,6 +43,12 @@ public enum Engine
         {
             return Engine.SCRIPT_ENGINE_MANAGER.getEngineByName("groovy");
         }
+
+        @Override
+        public String escapeCodeBlock(String script)
+        {
+            return escapeCodeBlock(script, "groovy");
+        }
     },
     JAVASCRIPT("js")
     {
@@ -62,6 +68,12 @@ public enum Engine
         public ScriptEngine newScriptEngine()
         {
             return Engine.SCRIPT_ENGINE_MANAGER.getEngineByName("nashorn");
+        }
+
+        @Override
+        public String escapeCodeBlock(String script)
+        {
+            return escapeCodeBlock(script, "js");
         }
     };
 
@@ -103,5 +115,12 @@ public enum Engine
         final ScriptEngine engine = this.newScriptEngine();
         engine.setContext(context);
         return engine;
+    }
+
+    public abstract String escapeCodeBlock(String script);
+
+    protected static String escapeCodeBlock(String script, String langName)
+    {
+        return script.replaceAll("^```(?:" + langName + "\\n)?([\\S\\s]+)\\n?```$", "$1");
     }
 }

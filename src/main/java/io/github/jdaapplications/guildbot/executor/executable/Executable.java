@@ -23,10 +23,11 @@ public abstract class Executable
     {
         this.guildBot = guildBot;
         this.config = config;
-        this.script = script;
 
         this.engine = Engine.getEngine(config.getString("lang", "js"));
 
+        this.script = this.engine.escapeCodeBlock(script);
+        
         final JsonValue importArray = config.get("imports");
         this.imports = Collections.unmodifiableSet(importArray == null
                 ? Collections.emptySet()

@@ -61,9 +61,10 @@ public class Method extends Executable
 
         this.executableScripts = Collections.unmodifiableMap(LazyMap.lazyMap(new HashMap<>(Engine.values().length), e -> e.getProxyMethod(name, this.type, this.params)));
 
-        this.proxyScript = this.engine.getScript(script, this.imports);
+        this.proxyScript = this.engine.getScript(this.getScript(), this.imports);
     }
 
+    @SuppressWarnings("hiding")
     public String getExecutableScript(final Engine engine)
     {
         return this.executableScripts.get(engine);

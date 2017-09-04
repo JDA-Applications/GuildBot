@@ -15,7 +15,7 @@ public class Command extends Executable
     {
         super(guildBot, config, script);
         this.id = channel;
-        this.executableScript = this.engine.getScript(script, this.imports);
+        this.executableScript = this.engine.getScript(this.getScript(), this.imports);
     }
 
     public String getExecutableScript()
@@ -25,6 +25,6 @@ public class Command extends Executable
 
     public long getChannelId()
     {
-        return id;
+        return this.id;
     }
 }

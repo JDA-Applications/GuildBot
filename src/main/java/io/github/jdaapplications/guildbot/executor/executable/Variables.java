@@ -14,7 +14,7 @@ public class Variables extends Executable
     {
         super(guildBot, config, script);
 
-        this.executableScript = this.engine.getScript(script, this.imports);
+        this.executableScript = this.engine.getScript(this.getScript(), this.imports);
     }
 
     public String getExecutableScript()

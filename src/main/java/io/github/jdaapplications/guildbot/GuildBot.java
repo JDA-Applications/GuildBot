@@ -52,6 +52,7 @@ public class GuildBot
 
     private CommandExecutor commandExecutor;
 
+    @SuppressWarnings("resource")
     public GuildBot(final File config, final String token, final String errorWebhook) throws LoginException, IllegalArgumentException, RateLimitedException, FileNotFoundException, IOException
     {
         this.config = JsonValue.readHjson(new FileReader(config)).asObject();
@@ -83,6 +84,7 @@ public class GuildBot
         this.jda = builder.buildAsync();
     }
 
+    @SuppressWarnings("unused")
     public static void main(final String[] args) throws Exception
     {
         final File config = new File(System.getProperty("guildbot.config", "config.hjson"));
@@ -120,7 +122,7 @@ public class GuildBot
 
     public void handleThrowable(final Throwable throwable, final String context)
     {
-        if (webhookUrl == null)
+        if (this.webhookUrl == null)
             return;
         final String trace = getTrace(throwable);
         final String message = String.format("```\n%.2000s```", trace.replace(getJDA().getToken(), "[REDACTED]"));
@@ -141,7 +143,7 @@ public class GuildBot
                     .toString();
 
             OkHttpClient client = ((JDAImpl) getJDA()).getRequester().getHttpClient();
-            Request request = new Request.Builder().url(webhookUrl)
+            Request request = new Request.Builder().url(this.webhookUrl)
                     .post(RequestBody.create(MediaType.parse("application/json"), body))
                     .addHeader("user-agent", "GuildBot (https://github.com/JDA-Applications/GuildBot)")
                     .addHeader("content-type", "application/json")
@@ -163,7 +165,7 @@ public class GuildBot
         }
     }
 
-    private String getTrace(final Throwable throwable)
+    private static String getTrace(final Throwable throwable)
     {
         StringBuilder builder = new StringBuilder(throwable.getClass().getName())
                 .append(": ")

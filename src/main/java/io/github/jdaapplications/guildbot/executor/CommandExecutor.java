@@ -122,12 +122,12 @@ public class CommandExecutor
     @SubscribeEvent
     private void onReconnect(final ReconnectedEvent event)
     {
-        Guild guild = event.getJDA().getGuildById(guildBot.getConfig().getLong("guildId", 0));
+        Guild guild = event.getJDA().getGuildById(this.guildBot.getConfig().getLong("guildId", 0));
 
         if (guild == null)
             return;
 
-        guildBot.getThreadPool().execute(() -> guild.getTextChannels().forEach(this::update));
+        this.guildBot.getThreadPool().execute(() -> guild.getTextChannels().forEach(this::update));
     }
 
     @SubscribeEvent
@@ -160,12 +160,12 @@ public class CommandExecutor
         if (channel.getGuild().getIdLong() != this.guildBot.getConfig().getLong("guildId", 0))
             return;
 
-        if (!this.isScriptChannel(channel))
+        if (!CommandExecutor.isScriptChannel(channel))
             return;
 
         try
         {
-            final JsonObject config = this.readConfig(channel);
+            final JsonObject config = CommandExecutor.readConfig(channel);
 
             Consumer<String> consumer;
 
@@ -198,14 +198,9 @@ public class CommandExecutor
             channel.getHistory().retrievePast(config.getInt("length", 1)).queue(l ->
             {
                 Collections.reverse(l);
-                final String script = l.stream().map(Message::getRawContent).map(s ->
-                {
-                    final String name = config.getString("lang", "js");
-                    if (s.startsWith("```" + name + '\n') && s.endsWith("\n```"))
-                        return s.substring(4 + name.length(), s.length() - 4);
-                    else
-                        return s;
-                }).collect(Collectors.joining("\n"));
+                final String script = l.stream()
+                        .map(Message::getRawContent)
+                        .collect(Collectors.joining("\n"));
                 consumer.accept(script);
             });
         }
@@ -213,7 +208,7 @@ public class CommandExecutor
         {
             final String message = "An error occurred while updating " + channel.getName();
             GuildBot.log.error(message, e);
-            guildBot.handleThrowable(e, message);
+            this.guildBot.handleThrowable(e, message);
             this.delete(channel);
         }
 
@@ -358,14 +353,16 @@ public class CommandExecutor
 
         // get all relevant channels
 
-        final List<TextChannel> channels = guild.getTextChannels().stream().filter(this::isScriptChannel).collect(Collectors.toList());
+        final List<TextChannel> channels = guild.getTextChannels().stream()
+                .filter(CommandExecutor::isScriptChannel)
+                .collect(Collectors.toList());
 
         final int channelCount = channels.size();
 
         // get configs in channel topic
 
         final TLongObjectMap<JsonObject> configs = new TLongObjectHashMap<>(channelCount);
-        channels.forEach(c -> configs.put(c.getIdLong(), this.readConfig(c)));
+        channels.forEach(c -> configs.put(c.getIdLong(), CommandExecutor.readConfig(c)));
 
         // get messages
 
@@ -374,14 +371,9 @@ public class CommandExecutor
         channels.forEach(c -> c.getHistory().retrievePast(configs.get(c.getIdLong()).getInt("length", 1)).queue(l ->
         {
             Collections.reverse(l);
-            messages.put(c.getIdLong(), l.stream().map(Message::getRawContent).map(s ->
-            {
-                final String name = configs.get(c.getIdLong()).getString("lang", "js");
-                if (s.startsWith("```" + name + '\n') && s.endsWith("\n```"))
-                    return s.substring(4 + name.length(), s.length() - 4);
-                else
-                    return s;
-            }).collect(Collectors.joining("\n")));
+            messages.put(c.getIdLong(), l.stream()
+                    .map(Message::getRawContent)
+                    .collect(Collectors.joining("\n")));
             latch.countDown();
         }, t ->
         {
@@ -458,14 +450,13 @@ public class CommandExecutor
         jda.addEventListener(this);
     }
 
-    private boolean isScriptChannel(final TextChannel channel)
+    private static boolean isScriptChannel(final TextChannel channel)
     {
         return channel.getName().startsWith("cmd-") || channel.getName().startsWith("mthd-") || channel.getName().startsWith("vars-");
     }
 
-    private JsonObject readConfig(final TextChannel channel)
+    private static JsonObject readConfig(final TextChannel channel)
     {
         return channel.getTopic() == null || channel.getTopic().isEmpty() ? new JsonObject() : JsonValue.readHjson(channel.getTopic()).asObject();
     }
-
 }
