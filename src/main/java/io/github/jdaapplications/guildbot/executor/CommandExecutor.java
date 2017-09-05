@@ -127,12 +127,7 @@ public class CommandExecutor
     @SubscribeEvent
     private void onReconnect(final ReconnectedEvent event)
     {
-        Guild guild = event.getJDA().getGuildById(this.guildBot.getConfig().getLong("guildId", 0));
-
-        if (guild == null)
-            return;
-
-        this.guildBot.getThreadPool().execute(() -> guild.getTextChannels().forEach(this::update));
+        this.reload();
     }
 
     @SubscribeEvent
@@ -241,6 +236,16 @@ public class CommandExecutor
     private synchronized void delete(final TextChannel channel)
     {
         this.delete(channel.getGuild().getIdLong(), channel.getName());
+    }
+
+    public synchronized void reload()
+    {
+        Guild guild = this.guildBot.getJDA().getGuildById(this.guildBot.getConfig().getLong("guildId", 0));
+
+        if (guild == null)
+            return;
+
+        this.guildBot.getThreadPool().execute(() -> guild.getTextChannels().forEach(this::update));
     }
 
     private synchronized void execute(final Command command, final MessageReceivedEvent event, final String args)
