@@ -1,7 +1,7 @@
 plugins {
     id 'java'
     id 'application'
-    id 'com.github.johnrengelman.shadow' version '2.0.0'
+    id 'com.github.johnrengelman.shadow' version '2.0.1'
     id 'com.github.ben-manes.versions' version '0.15.0'
 }
 
@@ -17,17 +17,12 @@ repositories {
 }
 
 dependencies {
-    compile group: 'net.dv8tion', name: 'JDA', version: '3.2.0_228'
-    compile group: 'com.sedmelluq', name: 'lavaplayer', version: '1.2.42'
-    compile group: 'org.hjson', name: 'hjson', version: '2.1.1'
+    compile group: 'net.dv8tion', name: 'JDA', version: '3.3.0_261'
+    compile group: 'com.sedmelluq', name: 'lavaplayer', version: '1.2.43'
+    compile group: 'org.hjson', name: 'hjson', version: '3.0.0'
     compile group: 'org.codehaus.groovy', name: 'groovy-jsr223', version: '2.4.9'
     compile group: 'ch.qos.logback', name: 'logback-classic', version: '1.2.3' 
+    compile group: 'org.apache.commons', name: 'commons-lang3', version: '3.6'
 }
 
 compileJava.options.encoding = 'UTF-8'
-
-task wrapper(type: Wrapper) {
-    group = 'build setup'
-    description = 'Generates Gradle wrapper files.'
-    gradleVersion = '4.0.1'
-}
