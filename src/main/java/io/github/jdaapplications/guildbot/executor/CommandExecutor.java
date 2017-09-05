@@ -6,6 +6,7 @@ import io.github.jdaapplications.guildbot.GuildBot;
 import io.github.jdaapplications.guildbot.executor.executable.Command;
 import io.github.jdaapplications.guildbot.executor.executable.Method;
 import io.github.jdaapplications.guildbot.executor.executable.Variables;
+import io.github.jdaapplications.guildbot.util.GuildBotUtils;
 import net.dv8tion.jda.core.EmbedBuilder;
 import net.dv8tion.jda.core.JDA;
 import net.dv8tion.jda.core.MessageBuilder;
@@ -25,8 +26,6 @@ import net.dv8tion.jda.core.hooks.SubscribeEvent;
 import net.dv8tion.jda.core.managers.Presence;
 import net.dv8tion.jda.core.requests.RestAction;
 import org.hjson.JsonObject;
-import org.hjson.JsonValue;
-
 import javax.script.Bindings;
 import javax.script.ScriptContext;
 import javax.script.ScriptEngine;
@@ -160,12 +159,12 @@ public class CommandExecutor
         if (channel.getGuild().getIdLong() != this.guildBot.getConfig().getLong("guildId", 0))
             return;
 
-        if (!CommandExecutor.isScriptChannel(channel))
+        if (!GuildBotUtils.isScriptChannel(channel))
             return;
 
         try
         {
-            final JsonObject config = CommandExecutor.readConfig(channel);
+            final JsonObject config = GuildBotUtils.readConfig(channel);
 
             Consumer<String> consumer;
 
@@ -365,7 +364,7 @@ public class CommandExecutor
         // get all relevant channels
 
         final List<TextChannel> channels = guild.getTextChannels().stream()
-                .filter(CommandExecutor::isScriptChannel)
+                .filter(GuildBotUtils::isScriptChannel)
                 .collect(Collectors.toList());
 
         final int channelCount = channels.size();
@@ -373,7 +372,7 @@ public class CommandExecutor
         // get configs in channel topic
 
         final TLongObjectMap<JsonObject> configs = new TLongObjectHashMap<>(channelCount);
-        channels.forEach(c -> configs.put(c.getIdLong(), CommandExecutor.readConfig(c)));
+        channels.forEach(c -> configs.put(c.getIdLong(), GuildBotUtils.readConfig(c)));
 
         // get messages
 
@@ -459,15 +458,5 @@ public class CommandExecutor
         presence.setPresence(OnlineStatus.ONLINE, game);
 
         jda.addEventListener(this);
-    }
-
-    private static boolean isScriptChannel(final TextChannel channel)
-    {
-        return channel.getName().startsWith("cmd-") || channel.getName().startsWith("mthd-") || channel.getName().startsWith("vars-");
-    }
-
-    private static JsonObject readConfig(final TextChannel channel)
-    {
-        return channel.getTopic() == null || channel.getTopic().isEmpty() ? new JsonObject() : JsonValue.readHjson(channel.getTopic()).asObject();
     }
 }

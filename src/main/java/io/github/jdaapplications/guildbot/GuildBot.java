@@ -1,6 +1,7 @@
 package io.github.jdaapplications.guildbot;
 
 import io.github.jdaapplications.guildbot.executor.CommandExecutor;
+import io.github.jdaapplications.guildbot.util.ExceptionUtils;
 import io.github.jdaapplications.guildbot.util.Properties;
 import net.dv8tion.jda.core.*;
 import net.dv8tion.jda.core.entities.Game;
@@ -124,7 +125,7 @@ public class GuildBot
     {
         if (this.webhookUrl == null)
             return;
-        final String trace = getTrace(throwable);
+        final String trace = ExceptionUtils.getTrace(throwable);
         final String message = String.format("```\n%.2000s```", trace.replace(getJDA().getToken(), "[REDACTED]"));
         final EmbedBuilder builder = new EmbedBuilder();
         if (context != null)
@@ -163,28 +164,6 @@ public class GuildBot
         {
             log.error("Unable to send error to webhook", e);
         }
-    }
-
-    private static String getTrace(final Throwable throwable)
-    {
-        StringBuilder builder = new StringBuilder(throwable.getClass().getName())
-                .append(": ")
-                .append(throwable.getMessage());
-
-        StackTraceElement[] elements = throwable.getStackTrace();
-        for (int i = 0; i < elements.length && i < 15; i++)
-        {
-            StackTraceElement element = elements[i];
-            // we don't need to go back further...
-            if (element.getClassName().startsWith("net.dv8tion.jda.core.hooks.AnnotatedEventManager"))
-            {
-                builder.append("\n\n<... omitting jda trace ...>");
-                break;
-            }
-            builder.append("\n\tat ").append(element.toString());
-        }
-
-        return builder.toString();
     }
 
     @SubscribeEvent
