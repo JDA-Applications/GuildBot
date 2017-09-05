@@ -6,6 +6,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -120,6 +121,10 @@ public class Method extends Executable
         catch (InterruptedException | TimeoutException e)
         {
             throw new RuntimeException("The execution of method \"" + this.name + "\" timed out\n" + this.proxyScript, e);
+        }
+        catch (final ExecutionException e)
+        {
+            throw new RuntimeException("The execution of method \"" + this.name + "\" threw an error\n" + this.proxyScript, e.getCause());
         }
         catch (final Exception e)
         {
