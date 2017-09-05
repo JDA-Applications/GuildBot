@@ -30,6 +30,7 @@ import org.hjson.JsonValue;
 import javax.script.Bindings;
 import javax.script.ScriptContext;
 import javax.script.ScriptEngine;
+import javax.script.SimpleBindings;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -49,9 +50,13 @@ public class CommandExecutor
     private Map<String, Method> methods;
     private Map<String, Variables> vars;
 
+    private final Bindings globalStore;
+
     public CommandExecutor(final GuildBot guildBot)
     {
         this.guildBot = guildBot;
+
+        this.globalStore = new SimpleBindings();
 
         guildBot.getThreadPool().execute(this::init);
     }
@@ -248,6 +253,7 @@ public class CommandExecutor
         bindings.put("event", event);
         bindings.put("args", args == null ? "" : args);
         bindings.put("guildBot", this.guildBot);
+        bindings.put("global", this.globalStore);
 
         final ScheduledExecutorService pool = this.guildBot.getThreadPool();
         for (final Entry<String, Variables> entry : this.vars.entrySet())
