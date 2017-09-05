@@ -43,9 +43,9 @@ import java.util.stream.Collectors;
  */
 public class CommandExecutor
 {
-    private Map<String, Command> commands;
-
     private final GuildBot guildBot;
+
+    private Map<String, Command> commands;
     private Map<String, Method> methods;
     private Map<String, Variables> vars;
 
@@ -272,7 +272,7 @@ public class CommandExecutor
             catch (final Exception e)
             {
                 final String varName = entry.getKey();
-                GuildBot.log.error("An error occurred while evaluating the vars \"{}\"\n{}\n{}", varName, variables.getExecutableScript(), e);
+                GuildBot.log.error("An error occurred while evaluating the vars \"{}\"\n{}\n{}", varName, variables.getExecutableScript(), e instanceof ExecutionException ? e.getCause() : e);
                 final String varContext = String.format("Trying to evaluate var: %#s", event.getJDA().getTextChannelById(varName));
                 this.guildBot.handleThrowable(e, varContext);
             }
@@ -291,13 +291,15 @@ public class CommandExecutor
                 if (script != null)
                     try
                     {
-                        engineEntry.getValue().eval(method.getExecutableScript(engine));
+                        final Future<?> future = pool.submit(() -> engineEntry.getValue().eval(method.getExecutableScript(engine)));
+
+                        future.get(command.getConfig().getInt("timeout", this.guildBot.getConfig().getInt("timeout", 5)), TimeUnit.SECONDS);
                     }
                     catch (final Exception e)
                     {
-                        GuildBot.log.error("An error occurred while evaluating the method \"{}\"\n{}\n{}", methodName, method.getExecutableScript(engine), e);
+                        GuildBot.log.error("An error occurred while evaluating the method \"{}\"\n{}\n{}", methodName, method.getExecutableScript(engine), e instanceof ExecutionException ? e.getCause() : e);
                         final String methodContext = String.format("Trying to evaluate method: %#s", event.getJDA().getTextChannelById(methodName));
-                        this.guildBot.handleThrowable(e, methodContext);
+                        this.guildBot.handleThrowable(e.getCause(), methodContext);
                     }
             }
         }
@@ -312,7 +314,7 @@ public class CommandExecutor
         }
         catch (final ExecutionException e)
         {
-            result = e;
+            result = e.getCause();
         }
         catch (TimeoutException | InterruptedException e)
         {
