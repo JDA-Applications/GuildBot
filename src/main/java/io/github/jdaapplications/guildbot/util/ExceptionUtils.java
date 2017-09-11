@@ -2,13 +2,12 @@ package io.github.jdaapplications.guildbot.util;
 
 public class ExceptionUtils
 {
-
     public static String getTrace(final Throwable throwable)
     {
         StringBuilder builder = new StringBuilder(throwable.getClass().getName())
                 .append(": ")
                 .append(throwable.getMessage());
-    
+
         StackTraceElement[] elements = throwable.getStackTrace();
         for (int i = 0; i < elements.length && i < 15; i++)
         {
@@ -21,8 +20,7 @@ public class ExceptionUtils
             }
             builder.append("\n\tat ").append(element.toString());
         }
-    
+
         return builder.toString();
     }
-
 }

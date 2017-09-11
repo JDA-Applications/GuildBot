@@ -2,7 +2,7 @@ package io.github.jdaapplications.guildbot;
 
 import io.github.jdaapplications.guildbot.executor.CommandExecutor;
 import io.github.jdaapplications.guildbot.util.ExceptionUtils;
-import io.github.jdaapplications.guildbot.util.Properties;
+import io.github.jdaapplications.guildbot.util.PropertyUtil;
 import net.dv8tion.jda.core.*;
 import net.dv8tion.jda.core.entities.Game;
 import net.dv8tion.jda.core.entities.impl.JDAImpl;
@@ -15,6 +15,7 @@ import net.dv8tion.jda.core.hooks.SubscribeEvent;
 import net.dv8tion.jda.core.requests.Requester;
 import net.dv8tion.jda.core.utils.IOUtil;
 import okhttp3.*;
+import org.apache.commons.io.FileUtils;
 import org.hjson.JsonObject;
 import org.hjson.JsonValue;
 import org.json.JSONArray;
@@ -25,7 +26,6 @@ import org.slf4j.LoggerFactory;
 import java.awt.Color;
 import java.io.File;
 import java.io.FileNotFoundException;
-import java.io.FileReader;
 import java.io.IOException;
 import java.nio.file.Paths;
 import java.util.concurrent.ScheduledExecutorService;
@@ -53,10 +53,9 @@ public class GuildBot
 
     private CommandExecutor commandExecutor;
 
-    @SuppressWarnings("resource")
     public GuildBot(final File config, final String token, final String errorWebhook) throws LoginException, IllegalArgumentException, RateLimitedException, FileNotFoundException, IOException
     {
-        this.config = JsonValue.readHjson(new FileReader(config)).asObject();
+        this.config = JsonValue.readHjson(FileUtils.readFileToString(config, "UTF-8")).asObject();
         this.webhookUrl = errorWebhook;
 
         this.threadPool = new ScheduledThreadPoolExecutor(4, r ->
@@ -90,11 +89,11 @@ public class GuildBot
     {
         final File config = new File(System.getProperty("guildbot.config", "config.hjson"));
 
-        String token = Properties.get("guildbot.token", Paths.get(".token"));
+        String token = PropertyUtil.getProperty("guildbot.token", Paths.get(".token"));
         if (token == null)
             throw new RuntimeException("could not find a token");
 
-        String webhook = Properties.get("guildbot.webhook.error", Paths.get(".error-hook"));
+        String webhook = PropertyUtil.getProperty("guildbot.webhook.error", Paths.get(".error-hook"));
         if (webhook == null)
             GuildBot.log.warn("could not find a error webhook token, disabling webhook");
 
@@ -137,19 +136,20 @@ public class GuildBot
                     .setDescription(String.format("%.2048s", message))
                     .build();
 
-
             final String body = new JSONObject()
                     .put("embeds", new JSONArray()
                         .put(embed.toJSONObject()))
                     .toString();
 
             OkHttpClient client = ((JDAImpl) getJDA()).getRequester().getHttpClient();
+
             Request request = new Request.Builder().url(this.webhookUrl)
                     .post(RequestBody.create(MediaType.parse("application/json"), body))
                     .addHeader("user-agent", "GuildBot (https://github.com/JDA-Applications/GuildBot)")
                     .addHeader("content-type", "application/json")
                     .addHeader("accept-encoding", "gzip")
                     .build();
+
             Call call = client.newCall(request);
             try (Response response = call.execute())
             {

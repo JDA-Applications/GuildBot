@@ -15,17 +15,16 @@ import org.apache.commons.lang3.tuple.Pair;
  */
 public enum Engine
 {
-
     GROOVY("groovy")
     {
         @Override
-        public String getProxyMethod(final String name, final Class<?> type, final List<Pair<String, ? extends Class<?>>> params)
+        public String getProxyMethod(final String methodName, final Class<?> type, final List<Pair<String, ? extends Class<?>>> params)
         {
-            return type.getTypeName() + ' ' + name + '(' 
+            return type.getTypeName() + ' ' + methodName + '(' 
                     + params.stream()
                         .map(e -> e.getValue().getTypeName() + ' ' + e.getKey())
                         .collect(Collectors.joining(", ")) 
-                    + ") { " + name + ".invoke(" 
+                    + ") { " + methodName + ".invoke(" 
                     + params.stream()
                         .map(Pair::getKey)
                         .collect(Collectors.joining(", "))
@@ -53,7 +52,7 @@ public enum Engine
     JAVASCRIPT("js")
     {
         @Override
-        public String getProxyMethod(final String name, final Class<?> type, final List<Pair<String, ? extends Class<?>>> params)
+        public String getProxyMethod(final String methodName, final Class<?> type, final List<Pair<String, ? extends Class<?>>> params)
         {
             return null;
         }
@@ -104,7 +103,7 @@ public enum Engine
         return this.name;
     }
 
-    public abstract String getProxyMethod(String name, Class<?> type, List<Pair<String, ? extends Class<?>>> params);
+    public abstract String getProxyMethod(String methodName, Class<?> type, List<Pair<String, ? extends Class<?>>> params);
 
     public abstract String getScript(String script, Collection<String> imports);
 

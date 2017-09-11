@@ -27,12 +27,14 @@ public abstract class Executable
         this.engine = Engine.getEngine(config.getString("lang", "js"));
 
         this.script = this.engine.escapeCodeBlock(script);
-        
+
         final JsonValue importArray = config.get("imports");
         this.imports = Collections.unmodifiableSet(importArray == null
                 ? Collections.emptySet()
                 : importArray.asArray().values().stream()
+                    .filter(JsonValue::isString)
                     .map(JsonValue::asString)
+                    .filter(s -> !s.isEmpty())
                     .collect(Collectors.toSet()));
     }
 

@@ -2,15 +2,13 @@ package io.github.jdaapplications.guildbot.executor.executable;
 
 import io.github.jdaapplications.guildbot.GuildBot;
 import io.github.jdaapplications.guildbot.executor.Engine;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 import javax.script.ScriptContext;
 import javax.script.ScriptEngine;
 import org.apache.commons.collections4.map.LazyMap;
@@ -47,11 +45,12 @@ public class Method extends Executable
 
         this.params = Collections.unmodifiableList(paramList == null 
                 ? Collections.emptyList() 
-                : paramList.names().stream()
-                    .map(k -> {
+                : StreamSupport.stream(paramList.spliterator(), false)
+                    .filter(m -> m.getValue().isString() && !m.getValue().asString().isEmpty())
+                    .map(m -> {
                         try
                         {
-                            return Pair.of(k, ClassUtils.getClass(paramList.get(k).asString()));
+                            return Pair.of(m.getName(), ClassUtils.getClass(m.getValue().asString()));
                         }
                         catch (ClassNotFoundException e)
                         {
@@ -65,10 +64,9 @@ public class Method extends Executable
         this.proxyScript = this.engine.getScript(this.getScript(), this.imports);
     }
 
-    @SuppressWarnings("hiding")
-    public String getExecutableScript(final Engine engine)
+    public String getExecutableScript(final Engine targetEngine)
     {
-        return this.executableScripts.get(engine);
+        return this.executableScripts.get(targetEngine);
     }
 
     public Map<Engine, String> getExecutableScripts()

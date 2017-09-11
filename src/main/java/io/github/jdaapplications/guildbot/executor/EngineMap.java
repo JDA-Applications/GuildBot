@@ -47,7 +47,6 @@ public class EngineMap
                 ((Bindings) scriptEngine.get("engines")).put(e.getName(), scriptEngine);
                 return scriptEngine;
             });
-
     }
 
     public Set<Entry<Engine, ScriptEngine>> entrySet()
@@ -64,5 +63,4 @@ public class EngineMap
     {
         return this.context;
     }
-
 }
