@@ -5,21 +5,17 @@ import io.github.jdaapplications.guildbot.util.ExceptionUtils;
 import io.github.jdaapplications.guildbot.util.PropertyUtil;
 import net.dv8tion.jda.core.*;
 import net.dv8tion.jda.core.entities.Game;
-import net.dv8tion.jda.core.entities.impl.JDAImpl;
-import net.dv8tion.jda.core.entities.impl.MessageEmbedImpl;
+import net.dv8tion.jda.core.entities.MessageEmbed;
 import net.dv8tion.jda.core.events.ReadyEvent;
 import net.dv8tion.jda.core.events.ShutdownEvent;
 import net.dv8tion.jda.core.exceptions.RateLimitedException;
 import net.dv8tion.jda.core.hooks.AnnotatedEventManager;
 import net.dv8tion.jda.core.hooks.SubscribeEvent;
-import net.dv8tion.jda.core.requests.Requester;
-import net.dv8tion.jda.core.utils.IOUtil;
-import okhttp3.*;
+import net.dv8tion.jda.webhook.WebhookClient;
+import net.dv8tion.jda.webhook.WebhookClientBuilder;
 import org.apache.commons.io.FileUtils;
 import org.hjson.JsonObject;
 import org.hjson.JsonValue;
-import org.json.JSONArray;
-import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -46,17 +42,16 @@ public class GuildBot
     private static final AtomicInteger threadCounter = new AtomicInteger(0);
     private static final Color error = Color.red;
 
-    private final String webhookUrl;
+    private final WebhookClient webhook;
     private final JsonObject config;
     private final JDA jda;
     private final ScheduledThreadPoolExecutor threadPool;
 
     private CommandExecutor commandExecutor;
 
-    public GuildBot(final File config, final String token, final String errorWebhook) throws LoginException, IllegalArgumentException, RateLimitedException, FileNotFoundException, IOException
+    public GuildBot(final File config, final String token, final String webhookURL) throws LoginException, IllegalArgumentException, RateLimitedException, FileNotFoundException, IOException
     {
         this.config = JsonValue.readHjson(FileUtils.readFileToString(config, "UTF-8")).asObject();
-        this.webhookUrl = errorWebhook;
 
         this.threadPool = new ScheduledThreadPoolExecutor(4, r ->
         {
@@ -69,6 +64,14 @@ public class GuildBot
             return t;
         });
         this.threadPool.setKeepAliveTime(1, TimeUnit.MINUTES);
+
+        this.webhook = webhookURL == null
+                ? null
+                : new WebhookClientBuilder(webhookURL)
+                .setExecutorService(threadPool)
+                .setDaemon(true)
+                .setThreadFactory(r -> new Thread(r, "Error-Webhook-Thread"))
+                .build();
 
         final JDABuilder builder = new JDABuilder(AccountType.BOT);
 
@@ -122,43 +125,26 @@ public class GuildBot
 
     public void handleThrowable(final Throwable throwable, final String context)
     {
-        if (this.webhookUrl == null)
-            return;
-        final String trace = ExceptionUtils.getTrace(throwable);
-        final String message = String.format("```\n%.2000s```", trace.replace(getJDA().getToken(), "[REDACTED]"));
-        final EmbedBuilder builder = new EmbedBuilder();
-        if (context != null)
-            builder.setFooter(context, null);
-        try
-        {
-            final MessageEmbedImpl embed = (MessageEmbedImpl) builder
+        try{
+            if (this.webhook == null)
+                return;
+
+            final String trace = ExceptionUtils.getTrace(throwable);
+            final String message = String.format("```\n%.2000s```", trace.replace(getJDA().getToken(), "[REDACTED]"));
+            final EmbedBuilder builder = new EmbedBuilder();
+            if (context != null)
+                builder.setFooter(context, null);
+
+            final MessageEmbed embed = builder
                     .setColor(error)
                     .setDescription(String.format("%.2048s", message))
                     .build();
 
-            final String body = new JSONObject()
-                    .put("embeds", new JSONArray()
-                        .put(embed.toJSONObject()))
-                    .toString();
-
-            OkHttpClient client = ((JDAImpl) getJDA()).getRequester().getHttpClient();
-
-            Request request = new Request.Builder().url(this.webhookUrl)
-                    .post(RequestBody.create(MediaType.parse("application/json"), body))
-                    .addHeader("user-agent", "GuildBot (https://github.com/JDA-Applications/GuildBot)")
-                    .addHeader("content-type", "application/json")
-                    .addHeader("accept-encoding", "gzip")
-                    .build();
-
-            Call call = client.newCall(request);
-            try (Response response = call.execute())
-            {
-                if (response.code() >= 300)
-                {
-                    log.error("Failed to send error hook ({})", response.code());
-                    log.error(new String(IOUtil.readFully(Requester.getBody(response))));
-                }
-            }
+            webhook.send(embed)
+                    .exceptionally(t -> {
+                        log.error("Unable to send error to webhook", t);
+                        return null;
+                    });
         }
         catch (Exception e)
         {

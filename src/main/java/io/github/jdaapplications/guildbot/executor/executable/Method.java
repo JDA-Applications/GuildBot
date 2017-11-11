@@ -131,7 +131,7 @@ public class Method extends Executable
     }
 
     @FunctionalInterface
-    public static interface InvokeableMethod
+    public interface InvokeableMethod
     {
         Object invoke(final Object... args);
     }
