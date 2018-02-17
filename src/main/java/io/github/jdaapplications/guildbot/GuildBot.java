@@ -8,7 +8,6 @@ import net.dv8tion.jda.core.entities.Game;
 import net.dv8tion.jda.core.entities.MessageEmbed;
 import net.dv8tion.jda.core.events.ReadyEvent;
 import net.dv8tion.jda.core.events.ShutdownEvent;
-import net.dv8tion.jda.core.exceptions.RateLimitedException;
 import net.dv8tion.jda.core.hooks.AnnotatedEventManager;
 import net.dv8tion.jda.core.hooks.SubscribeEvent;
 import net.dv8tion.jda.webhook.WebhookClient;
@@ -21,7 +20,6 @@ import org.slf4j.LoggerFactory;
 
 import java.awt.Color;
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.file.Paths;
 import java.util.concurrent.ScheduledExecutorService;
@@ -32,7 +30,7 @@ import javax.security.auth.login.LoginException;
 
 /**
  * The main class.
- * 
+ *
  * @author Aljoscha Grebe
  */
 public class GuildBot
@@ -49,7 +47,7 @@ public class GuildBot
 
     private CommandExecutor commandExecutor;
 
-    public GuildBot(final File config, final String token, final String webhookURL) throws LoginException, IllegalArgumentException, RateLimitedException, FileNotFoundException, IOException
+    public GuildBot(final File config, final String token, final String webhookURL) throws LoginException, IllegalArgumentException, IOException
     {
         this.config = JsonValue.readHjson(FileUtils.readFileToString(config, "UTF-8")).asObject();
 
@@ -79,7 +77,7 @@ public class GuildBot
 
         builder.setToken(token);
 
-        builder.setGame(Game.of("loading..."));
+        builder.setGame(Game.playing("loading..."));
         builder.setStatus(OnlineStatus.DO_NOT_DISTURB);
 
         builder.addEventListener(this);
@@ -87,7 +85,6 @@ public class GuildBot
         this.jda = builder.buildAsync();
     }
 
-    @SuppressWarnings("unused")
     public static void main(final String[] args) throws Exception
     {
         final File config = new File(System.getProperty("guildbot.config", "config.hjson"));
@@ -153,13 +150,13 @@ public class GuildBot
     }
 
     @SubscribeEvent
-    private void onReady(final ReadyEvent event)
+    protected void onReady(final ReadyEvent event)
     {
         this.commandExecutor = new CommandExecutor(this);
     }
 
     @SubscribeEvent
-    private void onShutdown(final ShutdownEvent event)
+    protected void onShutdown(final ShutdownEvent event)
     {
         this.threadPool.setKeepAliveTime(10, TimeUnit.SECONDS);
         this.threadPool.allowCoreThreadTimeOut(true);

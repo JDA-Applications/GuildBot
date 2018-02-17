@@ -43,13 +43,13 @@ import java.util.stream.Collectors;
  */
 public class CommandExecutor
 {
-    private final GuildBot guildBot;
+    protected final GuildBot guildBot;
 
-    private Map<String, Command> commands;
-    private Map<String, Method> methods;
-    private Map<String, Variables> vars;
+    protected Map<String, Command> commands;
+    protected Map<String, Method> methods;
+    protected Map<String, Variables> vars;
 
-    private final Bindings globalStore;
+    protected final Bindings globalStore;
 
     public CommandExecutor(final GuildBot guildBot)
     {
@@ -81,29 +81,29 @@ public class CommandExecutor
     }
 
     @SubscribeEvent
-    private void onGuildMessageDelete(final GuildMessageDeleteEvent event)
+    protected void onGuildMessageDelete(final GuildMessageDeleteEvent event)
     {
         this.update(event.getChannel());
     }
 
     @SubscribeEvent
-    private void onGuildMessageReceived(final GuildMessageReceivedEvent event)
+    protected void onGuildMessageReceived(final GuildMessageReceivedEvent event)
     {
         this.update(event.getChannel());
     }
 
     @SubscribeEvent
-    private void onGuildMessageUpdate(final GuildMessageUpdateEvent event)
+    protected void onGuildMessageUpdate(final GuildMessageUpdateEvent event)
     {
         this.update(event.getChannel());
     }
 
     @SubscribeEvent
-    private void onMessageReceived(final MessageReceivedEvent event)
+    protected void onMessageReceived(final MessageReceivedEvent event)
     {
         final String prefix = this.guildBot.getConfig().getString("prefix", this.guildBot.getJDA().getSelfUser().getAsMention() + ' ');
 
-        String content = event.getMessage().getRawContent();
+        String content = event.getMessage().getContentRaw();
         if (!content.startsWith(prefix))
             return;
 
@@ -124,37 +124,37 @@ public class CommandExecutor
     }
 
     @SubscribeEvent
-    private void onReconnect(final ReconnectedEvent event)
+    protected void onReconnect(final ReconnectedEvent event)
     {
         this.reload();
     }
 
     @SubscribeEvent
-    private void onTextChannelCreate(final TextChannelCreateEvent event)
+    protected void onTextChannelCreate(final TextChannelCreateEvent event)
     {
         this.update(event.getChannel());
     }
 
     @SubscribeEvent
-    private void onTextChannelDelete(final TextChannelDeleteEvent event)
+    protected void onTextChannelDelete(final TextChannelDeleteEvent event)
     {
         this.delete(event, event.getChannel().getName());
     }
 
     @SubscribeEvent
-    private void onTextChannelUpdateName(final TextChannelUpdateNameEvent event)
+    protected void onTextChannelUpdateName(final TextChannelUpdateNameEvent event)
     {
         this.delete(event, event.getOldName());
         this.update(event.getChannel());
     }
 
     @SubscribeEvent
-    private void onTextChannelUpdateTopic(final TextChannelUpdateTopicEvent event)
+    protected void onTextChannelUpdateTopic(final TextChannelUpdateTopicEvent event)
     {
         this.update(event.getChannel());
     }
 
-    private synchronized void update(final TextChannel channel)
+    protected synchronized void update(final TextChannel channel)
     {
         if (channel.getGuild().getIdLong() != this.guildBot.getConfig().getLong("guildId", 0))
             return;
@@ -198,7 +198,7 @@ public class CommandExecutor
             {
                 Collections.reverse(l);
                 final String script = l.stream()
-                        .map(Message::getRawContent)
+                        .map(Message::getContentRaw)
                         .collect(Collectors.joining("\n"));
                 consumer.accept(script);
             });
@@ -213,12 +213,12 @@ public class CommandExecutor
 
     }
 
-    private synchronized void delete(final GenericTextChannelEvent event, final String name)
+    protected synchronized void delete(final GenericTextChannelEvent event, final String name)
     {
         this.delete(event.getGuild().getIdLong(), name);
     }
 
-    private synchronized void delete(final long guildId, final String name)
+    protected synchronized void delete(final long guildId, final String name)
     {
         if (guildId != this.guildBot.getConfig().getLong("guildId", 0))
             return;
@@ -228,11 +228,11 @@ public class CommandExecutor
         else if (name.startsWith("vars-"))
             this.vars.remove(name.substring(5));
         else if (name.startsWith("cmd-"))
-            for (final String cName : name.substring(4).split("\\-"))
+            for (final String cName : name.substring(4).split("-"))
                 this.commands.remove(cName);
     }
 
-    private synchronized void delete(final TextChannel channel)
+    protected synchronized void delete(final TextChannel channel)
     {
         this.delete(channel.getGuild().getIdLong(), channel.getName());
     }
@@ -247,7 +247,7 @@ public class CommandExecutor
         this.guildBot.getThreadPool().execute(() -> guild.getTextChannels().forEach(this::update));
     }
 
-    private synchronized void execute(final Command command, final MessageReceivedEvent event, final String args)
+    protected synchronized void execute(final Command command, final MessageReceivedEvent event, final String args)
     {
         final EngineMap scriptEngines = new EngineMap();
 
@@ -347,7 +347,7 @@ public class CommandExecutor
         }
     }
 
-    private synchronized void init()
+    protected synchronized void init()
     {
         final JsonObject config = this.guildBot.getConfig();
 
@@ -384,7 +384,7 @@ public class CommandExecutor
         {
             Collections.reverse(l);
             messages.put(c.getIdLong(), l.stream()
-                    .map(Message::getRawContent)
+                    .map(Message::getContentRaw)
                     .collect(Collectors.joining("\n")));
             latch.countDown();
         }, t ->
@@ -456,7 +456,7 @@ public class CommandExecutor
         GuildBot.log.info("Accepting commands now");
 
         Presence presence = jda.getPresence();
-        Game game = Game.of(config.getString("prefix", jda.getSelfUser().getAsMention() + ' ') + "help");
+        Game game = Game.playing(config.getString("prefix", jda.getSelfUser().getAsMention() + ' ') + "help");
         presence.setPresence(OnlineStatus.ONLINE, game);
 
         jda.addEventListener(this);

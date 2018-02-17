@@ -1,14 +1,14 @@
 plugins {
     id 'java'
     id 'application'
-    id 'com.github.johnrengelman.shadow' version '2.0.1'
+    id 'com.github.johnrengelman.shadow' version '2.0.2'
     id 'com.github.ben-manes.versions' version '0.17.0'
 }
 
 mainClassName = 'io.github.jdaapplications.guildbot.GuildBot'
 
 group = 'io.github.jda-applications'
-version '2.0'
+version = '2.0'
 
 sourceCompatibility = 1.8
 
@@ -17,12 +17,27 @@ repositories {
 }
 
 dependencies {
-    compile group: 'net.dv8tion', name: 'JDA', version: '3.3.1_303'
-    compile group: 'com.sedmelluq', name: 'lavaplayer', version: '1.2.44'
+    compile group: 'net.dv8tion', name: 'JDA', version: '3.5.1_339'
+    // compile group: 'com.sedmelluq', name: 'lavaplayer', version: '1.2.51'
     compile group: 'org.hjson', name: 'hjson', version: '3.0.0'
-    compile group: 'org.codehaus.groovy', name: 'groovy-jsr223', version: '2.4.12'
+    compile group: 'org.codehaus.groovy', name: 'groovy-jsr223', version: '2.4.13'
     compile group: 'ch.qos.logback', name: 'logback-classic', version: '1.2.3'
     compile group: 'org.apache.commons', name: 'commons-lang3', version: '3.7'
+    compile group: 'commons-io', name: 'commons-io', version: '2.6'
+    compile group: 'org.json', name: 'json', version: '20180130'
 }
 
 compileJava.options.encoding = 'UTF-8'
+
+dependencyUpdates.resolutionStrategy = {
+    componentSelection { rules ->
+        rules.all { ComponentSelection selection ->
+            boolean rejected = ['alpha', 'beta', 'rc', 'cr', 'm'].any { qualifier ->
+                selection.candidate.version ==~ /(?i).*[.-]${qualifier}[.\d-]*/
+            }
+            if (rejected) {
+                selection.reject('Release candidate')
+            }
+        }
+    }
+}

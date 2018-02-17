@@ -133,6 +133,7 @@ public class Method extends Executable
     @FunctionalInterface
     public interface InvokeableMethod
     {
+        @SuppressWarnings("UnusedReturnValue")
         Object invoke(final Object... args);
     }
 }

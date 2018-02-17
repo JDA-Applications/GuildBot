@@ -16,7 +16,7 @@ import javax.script.ScriptException;
 public class EngineMap
 {
     protected final ScriptContext context;
-    protected Map<Engine, ScriptEngine> map;
+    protected final Map<Engine, ScriptEngine> map;
 
     public EngineMap()
     {
